@@ -17,7 +17,7 @@ An interactive educational website featuring 3D visualizations for mobile roboti
 
 ## Live Demo
 
-Visit the live website: [Your GitHub Pages URL will go here]
+Visit the live website: [https://shailendrasekhar.github.io/robotics-3d-visualizations/]
 
 ## Local Development
 
