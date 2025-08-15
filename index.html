@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Euler Angles Visualization</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="nav-header">
+                <h3>Mobile Robotics</h3>
+                <p>3D Visualizations</p>
+            </div>
+            <ul class="nav-list">
+                <li><a href="index.html" class="nav-item active">Euler Angles</a></li>
+                <li><a href="coordinate-frames.html" class="nav-item">Coordinate Frames</a></li>
+                <li><a href="quaternions.html" class="nav-item">Quaternions</a></li>
+            </ul>
+        </nav>
+
+        <div class="main-wrapper">
+            <header>
+                <h1>Interactive Euler Angles Visualization</h1>
+                <p>Explore how roll, pitch, and yaw rotations work in 3D space</p>
+            </header>
+
+        <div class="main-content">
+            <div class="visualization-panel">
+                <div id="threejs-container"></div>
+                <div class="info-panel">
+                    <h3>Current Rotation</h3>
+                    <div id="rotation-info">
+                        <p>Roll (X-axis): <span id="roll-value">0°</span></p>
+                        <p>Pitch (Y-axis): <span id="pitch-value">0°</span></p>
+                        <p>Yaw (Z-axis): <span id="yaw-value">0°</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="control-section">
+                    <h3>Euler Angles Control</h3>
+                    <div class="slider-group">
+                        <label for="roll-slider">Roll (X-axis rotation):</label>
+                        <input type="range" id="roll-slider" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="roll-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="pitch-slider">Pitch (Y-axis rotation):</label>
+                        <input type="range" id="pitch-slider" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="pitch-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="yaw-slider">Yaw (Z-axis rotation):</label>
+                        <input type="range" id="yaw-slider" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="yaw-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                    <button id="reset-btn">Reset All</button>
+                </div>
+
+                <div class="control-section">
+                    <h3>Rotation Matrix</h3>
+                    <p class="matrix-description">Edit the values directly or use the sliders above. Changes update both the matrix and Euler angles.</p>
+                    <div class="matrix-input-grid">
+                        <input type="number" id="r11" step="0.001" value="1.000">
+                        <input type="number" id="r12" step="0.001" value="0.000">
+                        <input type="number" id="r13" step="0.001" value="0.000">
+                        <input type="number" id="r21" step="0.001" value="0.000">
+                        <input type="number" id="r22" step="0.001" value="1.000">
+                        <input type="number" id="r23" step="0.001" value="0.000">
+                        <input type="number" id="r31" step="0.001" value="0.000">
+                        <input type="number" id="r32" step="0.001" value="0.000">
+                        <input type="number" id="r33" step="0.001" value="1.000">
+                    </div>
+                    <div class="matrix-actions">
+                        <button id="normalize-matrix-btn">Normalize Matrix</button>
+                        <button id="identity-matrix-btn">Reset to Identity</button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Rotation Order</h3>
+                    <select id="rotation-order">
+                        <option value="XYZ">XYZ (Roll-Pitch-Yaw)</option>
+                        <option value="ZYX">ZYX (Yaw-Pitch-Roll)</option>
+                        <option value="YXZ">YXZ</option>
+                        <option value="ZXY">ZXY</option>
+                        <option value="XZY">XZY</option>
+                        <option value="YZX">YZX</option>
+                    </select>
+                </div>
+
+                <div class="control-section">
+                    <h3>Presets</h3>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" data-roll="90" data-pitch="0" data-yaw="0">90° Roll</button>
+                        <button class="preset-btn" data-roll="0" data-pitch="90" data-yaw="0">90° Pitch</button>
+                        <button class="preset-btn" data-roll="0" data-pitch="0" data-yaw="90">90° Yaw</button>
+                        <button class="preset-btn" data-roll="45" data-pitch="45" data-yaw="45">45° All</button>
+                        <button class="preset-btn" data-roll="180" data-pitch="0" data-yaw="0">180° Roll</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="explanation-panel">
+            <h3>Understanding Euler Angles</h3>
+            <div class="coordinate-system-note">
+                <h4>Coordinate System Convention</h4>
+                <p><strong>This visualization uses the standard aerospace convention:</strong></p>
+                <p>• X-axis (Red): Forward/Longitudinal axis • Y-axis (Green): Right/Lateral axis • Z-axis (Blue): Up/Vertical axis</p>
+                <p>• Roll = rotation around X-axis • Pitch = rotation around Y-axis • Yaw = rotation around Z-axis</p>
+            </div>
+            <div class="explanation-content">
+                <div class="explanation-item">
+                    <h4>Roll (X-axis rotation)</h4>
+                    <p>Rotation around the X-axis (longitudinal axis). Think of an airplane rolling left or right while maintaining its forward direction. Red axis in the visualization.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Pitch (Y-axis rotation)</h4>
+                    <p>Rotation around the Y-axis (lateral axis). Like an airplane's nose going up or down. Green axis in the visualization.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Yaw (Z-axis rotation)</h4>
+                    <p>Rotation around the Z-axis (vertical axis). Like turning left or right while keeping level. Blue axis in the visualization.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Rotation Matrix</h4>
+                    <p>The 3×3 matrix that represents the combined rotation. Each column represents where the original X, Y, and Z axes point after rotation.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Gimbal Lock</h4>
+                    <p>A limitation of Euler angles where certain rotations can cause loss of one degree of freedom. Try setting pitch to ±90° to see this effect.</p>
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>

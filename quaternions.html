@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quaternions Visualization</title>
+    <link rel="stylesheet" href="quaternions-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="nav-header">
+                <h3>Mobile Robotics</h3>
+                <p>3D Visualizations</p>
+            </div>
+            <ul class="nav-list">
+                <li><a href="index.html" class="nav-item">Euler Angles</a></li>
+                <li><a href="coordinate-frames.html" class="nav-item">Coordinate Frames</a></li>
+                <li><a href="quaternions.html" class="nav-item active">Quaternions</a></li>
+            </ul>
+        </nav>
+
+        <div class="main-wrapper">
+            <header>
+                <h1>Quaternions Visualization</h1>
+                <p>Explore quaternion rotations and their advantages over Euler angles</p>
+            </header>
+
+            <div class="main-content">
+                <div class="visualization-panel">
+                    <div id="threejs-container"></div>
+                    <div class="info-panel">
+                        <h3>Current Quaternion</h3>
+                        <div id="quaternion-info">
+                            <p>w: <span id="quat-w">1.000</span></p>
+                            <p>x: <span id="quat-x">0.000</span></p>
+                            <p>y: <span id="quat-y">0.000</span></p>
+                            <p>z: <span id="quat-z">0.000</span></p>
+                            <p>Magnitude: <span id="quat-magnitude">1.000</span> <span id="magnitude-status" class="status-indicator">✓ Normalized</span></p>
+                        </div>
+                        <div id="euler-equivalent">
+                            <h4>Equivalent Euler Angles:</h4>
+                            <p>Roll: <span id="euler-roll">0°</span></p>
+                            <p>Pitch: <span id="euler-pitch">0°</span></p>
+                            <p>Yaw: <span id="euler-yaw">0°</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls-panel">
+                    <div class="control-section">
+                        <h3>Quaternion Input</h3>
+                        <div class="quaternion-input">
+                            <div class="quat-component">
+                                <label for="quat-w-slider">w (scalar):</label>
+                                <input type="range" id="quat-w-slider" min="-1" max="1" value="1.000" step="0.001">
+                                <input type="number" id="quat-w-input" value="1.000" step="0.001" min="-1" max="1">
+                            </div>
+                            <div class="quat-component">
+                                <label for="quat-x-slider">x (vector):</label>
+                                <input type="range" id="quat-x-slider" min="-1" max="1" value="0.000" step="0.001">
+                                <input type="number" id="quat-x-input" value="0.000" step="0.001" min="-1" max="1">
+                            </div>
+                            <div class="quat-component">
+                                <label for="quat-y-slider">y (vector):</label>
+                                <input type="range" id="quat-y-slider" min="-1" max="1" value="0.000" step="0.001">
+                                <input type="number" id="quat-y-input" value="0.000" step="0.001" min="-1" max="1">
+                            </div>
+                            <div class="quat-component">
+                                <label for="quat-z-slider">z (vector):</label>
+                                <input type="range" id="quat-z-slider" min="-1" max="1" value="0.000" step="0.001">
+                                <input type="number" id="quat-z-input" value="0.000" step="0.001" min="-1" max="1">
+                            </div>
+                        </div>
+                        <div class="quat-actions">
+                            <button id="normalize-quat-btn">Normalize</button>
+                            <button id="identity-quat-btn">Identity</button>
+                        </div>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>Axis-Angle Input</h3>
+                        <div class="axis-angle-input">
+                            <div class="axis-input">
+                                <h4>Rotation Axis:</h4>
+                                <div class="axis-controls">
+                                    <label>X: <input type="number" id="axis-x" value="1" step="0.1" min="-1" max="1"></label>
+                                    <label>Y: <input type="number" id="axis-y" value="0" step="0.1" min="-1" max="1"></label>
+                                    <label>Z: <input type="number" id="axis-z" value="0" step="0.1" min="-1" max="1"></label>
+                                </div>
+                            </div>
+                            <div class="angle-input">
+                                <label for="rotation-angle">Rotation Angle:</label>
+                                <input type="range" id="rotation-angle" min="0" max="360" value="0" step="1">
+                                <input type="number" id="rotation-angle-input" min="0" max="360" value="0" step="1">
+                                <span>degrees</span>
+                            </div>
+                        </div>
+                        <button id="apply-axis-angle-btn">Apply Axis-Angle</button>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>Euler Angles Input</h3>
+                        <div class="euler-input">
+                            <div class="slider-group">
+                                <label for="euler-roll-slider">Roll:</label>
+                                <input type="range" id="euler-roll-slider" min="-180" max="180" value="0" step="1">
+                                <input type="number" id="euler-roll-input" min="-180" max="180" value="0" step="1">
+                            </div>
+                            <div class="slider-group">
+                                <label for="euler-pitch-slider">Pitch:</label>
+                                <input type="range" id="euler-pitch-slider" min="-180" max="180" value="0" step="1">
+                                <input type="number" id="euler-pitch-input" min="-180" max="180" value="0" step="1">
+                            </div>
+                            <div class="slider-group">
+                                <label for="euler-yaw-slider">Yaw:</label>
+                                <input type="range" id="euler-yaw-slider" min="-180" max="180" value="0" step="1">
+                                <input type="number" id="euler-yaw-input" min="-180" max="180" value="0" step="1">
+                            </div>
+                        </div>
+                        <button id="apply-euler-btn">Convert to Quaternion</button>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>Presets</h3>
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-preset="identity">Identity</button>
+                            <button class="preset-btn" data-preset="90x">90° X-axis</button>
+                            <button class="preset-btn" data-preset="90y">90° Y-axis</button>
+                            <button class="preset-btn" data-preset="90z">90° Z-axis</button>
+                            <button class="preset-btn" data-preset="180x">180° X-axis</button>
+                            <button class="preset-btn" data-preset="arbitrary">Arbitrary Rotation</button>
+                        </div>
+                    </div>
+
+                    <div class="control-section">
+                        <h3>Quaternion Operations</h3>
+                        <div class="operation-buttons">
+                            <button id="conjugate-btn">Conjugate</button>
+                            <button id="inverse-btn">Inverse</button>
+                            <button id="double-angle-btn">Double Angle</button>
+                            <button id="half-angle-btn">Half Angle</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation-panel">
+                <h3>Understanding Quaternions</h3>
+                <div class="explanation-content">
+                    <div class="explanation-item">
+                        <h4>What are Quaternions?</h4>
+                        <p>Quaternions are a mathematical system extending complex numbers, used to represent rotations in 3D space. A quaternion has four components: w + xi + yj + zk.</p>
+                    </div>
+                    <div class="explanation-item">
+                        <h4>Unit Quaternions</h4>
+                        <p>For rotations, we use unit quaternions where w² + x² + y² + z² = 1. The scalar part (w) and vector part (x,y,z) encode the rotation. When you manually adjust quaternion components, they are automatically normalized to maintain this constraint.</p>
+                    </div>
+                    <div class="explanation-item">
+                        <h4>Axis-Angle Representation</h4>
+                        <p>A quaternion can be constructed from an axis of rotation and an angle: q = cos(θ/2) + sin(θ/2)(xi + yj + zk)</p>
+                    </div>
+                    <div class="explanation-item">
+                        <h4>Advantages over Euler Angles</h4>
+                        <p>No gimbal lock, smooth interpolation, more numerically stable, and compact representation. Perfect for robotics and animation.</p>
+                    </div>
+                    <div class="explanation-item">
+                        <h4>Quaternion Operations</h4>
+                        <p>Conjugate: q* = w - xi - yj - zk. Inverse: q⁻¹ = q*/|q|². Composition: multiply quaternions to combine rotations.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="quaternions-script.js"></script>
+</body>
+</html>

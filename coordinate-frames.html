@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordinate Frames & Transformations Visualization</title>
+    <link rel="stylesheet" href="frames-style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="nav-header">
+                <h3>Mobile Robotics</h3>
+                <p>3D Visualizations</p>
+            </div>
+            <ul class="nav-list">
+                <li><a href="index.html" class="nav-item">Euler Angles</a></li>
+                <li><a href="coordinate-frames.html" class="nav-item active">Coordinate Frames</a></li>
+                <li><a href="quaternions.html" class="nav-item">Quaternions</a></li>
+            </ul>
+        </nav>
+
+        <div class="main-wrapper">
+            <header>
+                <h1>Coordinate Frames & Transformations</h1>
+                <p>Visualize how coordinate frames relate to each other through transformations</p>
+            </header>
+
+        <div class="main-content">
+            <div class="visualization-panel">
+                <div id="threejs-container"></div>
+                <div class="info-panel">
+                    <h3>Frame Information</h3>
+                    <div id="frame-info">
+                        <div class="frame-item">
+                            <h4>World Frame (W)</h4>
+                            <p>Origin: (0, 0, 0)</p>
+                            <p>Fixed reference frame</p>
+                        </div>
+                        <div class="frame-item">
+                            <h4>Body Frame (B)</h4>
+                            <p>Position: <span id="body-position">(0, 0, 0)</span></p>
+                            <p>Rotation: <span id="body-rotation">(0°, 0°, 0°)</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-panel">
+                <div class="control-section">
+                    <h3>Frame Controls</h3>
+                    <div class="frame-controls">
+                        <label>
+                            <input type="checkbox" id="show-world-frame" checked> Show World Frame
+                        </label>
+                        <label>
+                            <input type="checkbox" id="show-body-frame" checked> Show Body Frame
+                        </label>
+                        <label>
+                            <input type="checkbox" id="show-grid" checked> Show Grid
+                        </label>
+                        <label>
+                            <input type="checkbox" id="show-transformation-matrix" checked> Show Transformation Matrix
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Translation</h3>
+                    <div class="slider-group">
+                        <label for="trans-x">X Position:</label>
+                        <input type="range" id="trans-x" min="-5" max="5" value="0" step="0.1">
+                        <input type="number" id="trans-x-input" min="-10" max="10" value="0" step="0.1">
+                        <span>units</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="trans-y">Y Position:</label>
+                        <input type="range" id="trans-y" min="-5" max="5" value="0" step="0.1">
+                        <input type="number" id="trans-y-input" min="-10" max="10" value="0" step="0.1">
+                        <span>units</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="trans-z">Z Position:</label>
+                        <input type="range" id="trans-z" min="-5" max="5" value="0" step="0.1">
+                        <input type="number" id="trans-z-input" min="-10" max="10" value="0" step="0.1">
+                        <span>units</span>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Rotation</h3>
+                    <div class="slider-group">
+                        <label for="rot-x">Roll (X):</label>
+                        <input type="range" id="rot-x" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="rot-x-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="rot-y">Pitch (Y):</label>
+                        <input type="range" id="rot-y" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="rot-y-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                    <div class="slider-group">
+                        <label for="rot-z">Yaw (Z):</label>
+                        <input type="range" id="rot-z" min="-180" max="180" value="0" step="1">
+                        <input type="number" id="rot-z-input" min="-180" max="180" value="0" step="1">
+                        <span>degrees</span>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Transformation Matrix (T_WB)</h3>
+                    <div class="transformation-matrix">
+                        <div class="matrix-4x4">
+                            <div class="matrix-row">
+                                <span id="t11">1.000</span>
+                                <span id="t12">0.000</span>
+                                <span id="t13">0.000</span>
+                                <span id="t14">0.000</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span id="t21">0.000</span>
+                                <span id="t22">1.000</span>
+                                <span id="t23">0.000</span>
+                                <span id="t24">0.000</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span id="t31">0.000</span>
+                                <span id="t32">0.000</span>
+                                <span id="t33">1.000</span>
+                                <span id="t34">0.000</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span id="t41">0.000</span>
+                                <span id="t42">0.000</span>
+                                <span id="t43">0.000</span>
+                                <span id="t44">1.000</span>
+                            </div>
+                        </div>
+                        <div class="matrix-labels">
+                            <p><strong>Upper-left 3×3:</strong> Rotation matrix</p>
+                            <p><strong>Right column:</strong> Translation vector</p>
+                            <p><strong>Bottom row:</strong> [0 0 0 1] (homogeneous)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Point Transformation</h3>
+                    <div class="point-input">
+                        <h4>Point in Body Frame:</h4>
+                        <div class="point-coords">
+                            <label>X: <input type="number" id="point-x" value="1" step="0.1"></label>
+                            <label>Y: <input type="number" id="point-y" value="0" step="0.1"></label>
+                            <label>Z: <input type="number" id="point-z" value="0" step="0.1"></label>
+                        </div>
+                        <button id="add-point-btn">Add Point</button>
+                        <button id="clear-points-btn">Clear All Points</button>
+                    </div>
+                    <div class="transformed-point">
+                        <h4>Point in World Frame:</h4>
+                        <p id="transformed-coords">(1.0, 0.0, 0.0)</p>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h3>Presets</h3>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" data-preset="identity">Identity</button>
+                        <button class="preset-btn" data-preset="translation">Translation Only</button>
+                        <button class="preset-btn" data-preset="rotation">Rotation Only</button>
+                        <button class="preset-btn" data-preset="combined">Combined Transform</button>
+                        <button class="preset-btn" data-preset="robot-pose">Robot Pose</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="explanation-panel">
+            <h3>Understanding Coordinate Transformations</h3>
+            <div class="explanation-content">
+                <div class="explanation-item">
+                    <h4>Coordinate Frames</h4>
+                    <p>Each coordinate frame has its own origin and orientation. The world frame (W) is our reference, while the body frame (B) can move and rotate relative to it.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Transformation Matrix T_WB</h4>
+                    <p>A 4×4 matrix that describes how to transform points from the body frame to the world frame. It combines rotation (3×3 upper-left) and translation (right column).</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Homogeneous Coordinates</h4>
+                    <p>We use 4×1 vectors [x, y, z, 1] to represent points, allowing both rotation and translation in a single matrix multiplication.</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Point Transformation</h4>
+                    <p>To transform a point P_B from body frame to world frame: P_W = T_WB × P_B. Try adding points to see this in action!</p>
+                </div>
+                <div class="explanation-item">
+                    <h4>Applications</h4>
+                    <p>Essential for robotics: sensor fusion, path planning, manipulator kinematics, and SLAM (Simultaneous Localization and Mapping).</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="frames-script.js"></script>
+</body>
+</html>
