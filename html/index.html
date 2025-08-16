@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Interactive Euler Angles Visualization</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/enhancements.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
 </head>
@@ -23,6 +24,28 @@
         </nav>
 
         <div class="main-wrapper">
+            <div id="loading-screen" style="display: none;">
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <h3>Loading Euler Angles Visualization</h3>
+                    <div class="loading-progress-container">
+                        <div id="loading-progress"></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="settings-toggle">⚙️</button>
+            <div class="settings-panel">
+                <h4>Visualization Settings</h4>
+                <label><input type="checkbox" id="show-axes" checked> Show Coordinate Axes</label>
+                <label><input type="checkbox" id="show-object" checked> Show Object</label>
+                <label><input type="checkbox" id="show-matrix" checked> Show Rotation Matrix</label>
+                <label><input type="checkbox" id="auto-rotate"> Auto Rotate</label>
+                <label>Rotation Speed: <input type="range" id="rotation-speed" min="0.1" max="2" value="1" step="0.1"></label>
+            </div>
+
+            <div id="fps-counter">FPS: --</div>
+
             <header>
                 <h1>Interactive Euler Angles Visualization</h1>
                 <p>Explore how roll, pitch, and yaw rotations work in 3D space</p>
@@ -139,9 +162,9 @@
                     <h4>Gimbal Lock</h4>
                     <p>A limitation of Euler angles where certain rotations can cause loss of one degree of freedom. Try setting pitch to ±90° to see this effect.</p>
                 </div>
-            </div>
         </div>
+    </div>
 
-        <script src="script.js"></script>
-    </body>
+    <script src="../js/script.js"></script>
+</body>
 </html>

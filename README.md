@@ -1,39 +1,70 @@
-# Mobile Robotics 3D Visualizations
+# Mobile Robotics 3D Visualizations - Final Clean State
 
-An interactive educational website featuring 3D visualizations for mobile robotics concepts.
+## Available Pages
+The following visualization pages are currently available:
 
-## Features
+1. **Euler Angles** (`html/index.html`)
+   - Interactive 3D visualization of roll, pitch, and yaw rotations
+   - Real-time controls for each rotation axis
+   - Visual representation of rotation effects
 
-- **Euler Angles Visualization**: Interactive exploration of roll, pitch, and yaw rotations
-- **Coordinate Frames**: Understanding different reference frames in robotics
-- **Quaternions**: Advanced rotation representations and their applications
+2. **Coordinate Frames** (`html/coordinate-frames.html`)
+   - Visualization of coordinate frame transformations
+   - Multiple reference frames and their relationships
+   - Interactive transformation controls
 
-## Technologies Used
+3. **Quaternions** (`html/quaternions.html`)
+   - Quaternion rotation visualization
+   - Comparison with Euler angles
+   - Interactive quaternion manipulation
+   - Enhanced explanation of conjugate vs inverse operations
 
-- Pure HTML, CSS, and JavaScript
-- Three.js for 3D graphics rendering
-- dat.GUI for interactive controls
-- Responsive design for mobile and desktop
+## Completely Removed
+All unused and unwanted components have been removed:
 
-## Live Demo
+- ❌ **SLAM Visualization** 
+- ❌ **Sensor Fusion**  
+- ❌ **Path Planning Algorithms**
+- ❌ **Fullscreen Controls** 
+- ❌ **Educational Elements** (tutorials/exercises)
+- ❌ **Unused Scripts** (animation.js, exercises.js, tutorial.js, utils.js)
+- ❌ **Empty Assets** folder
 
-Visit the live website: [https://shailendrasekhar.github.io/robotics-3d-visualizations/]
+## Final Project Structure
+```
+robotics-3d-visualizations/
+├── README.md                     # This documentation file
+├── html/                         # HTML pages
+│   ├── index.html               # Euler Angles page
+│   ├── coordinate-frames.html   # Coordinate Frames page  
+│   └── quaternions.html         # Quaternions page
+├── css/                         # Stylesheets
+│   ├── style.css               # Main styles (used by index.html)
+│   ├── enhancements.css        # Enhanced UI styles (used by all)
+│   ├── frames-style.css        # Coordinate frames styles
+│   └── quaternions-style.css   # Quaternions styles
+└── js/                          # JavaScript files
+    ├── script.js               # Euler Angles functionality
+    ├── frames-script.js        # Coordinate Frames functionality
+    └── quaternions-script.js   # Quaternions functionality
+```
 
-## Local Development
+## Technology Stack
+- Three.js r128 for 3D graphics
+- dat.GUI for Euler Angles controls
+- Pure HTML/CSS/JavaScript
+- No external dependencies beyond Three.js and dat.GUI
+- Responsive design
 
-1. Clone this repository
-2. Open `index.html` in your web browser
-3. No build process required - it's a static website!
+## Getting Started
+Open any HTML file in the `html/` folder with a web browser:
+- `html/index.html` - Euler Angles visualization
+- `html/coordinate-frames.html` - Coordinate Frames visualization  
+- `html/quaternions.html` - Quaternions visualization
 
-## Educational Content
+## Navigation
+All pages have clean navigation menus with only the 3 available sections. No broken links or missing files.
 
-This website is designed to help students understand:
-- 3D rotations and transformations
-- Euler angles and their limitations (gimbal lock)
-- Rotation matrices and their properties
-- Coordinate frame transformations
-- Quaternion mathematics and advantages
+**Total Files: 11** (3 HTML + 4 CSS + 3 JS + 1 README)
 
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
+All functionality is working properly. The project is now completely clean with no unused files and organized folder structure.

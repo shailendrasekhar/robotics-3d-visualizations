@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quaternions Visualization</title>
-    <link rel="stylesheet" href="quaternions-style.css">
+    <link rel="stylesheet" href="../css/quaternions-style.css">
+    <link rel="stylesheet" href="../css/enhancements.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
@@ -22,6 +23,8 @@
         </nav>
 
         <div class="main-wrapper">
+            <div id="fps-counter">FPS: --</div>
+
             <header>
                 <h1>Quaternions Visualization</h1>
                 <p>Explore quaternion rotations and their advantages over Euler angles</p>
@@ -166,14 +169,17 @@
                         <p>No gimbal lock, smooth interpolation, more numerically stable, and compact representation. Perfect for robotics and animation.</p>
                     </div>
                     <div class="explanation-item">
-                        <h4>Quaternion Operations</h4>
-                        <p>Conjugate: q* = w - xi - yj - zk. Inverse: q⁻¹ = q*/|q|². Composition: multiply quaternions to combine rotations.</p>
+                        <h4>Conjugate vs Inverse</h4>
+                        <p><strong>Conjugate:</strong> q* = w - xi - yj - zk (negate imaginary parts)</p>
+                        <p><strong>Inverse:</strong> q⁻¹ = q*/|q|² (conjugate divided by magnitude squared)</p>
+                        <p><strong>For unit quaternions:</strong> |q| = 1, so q⁻¹ = q* (conjugate equals inverse)</p>
+                        <p><strong>Use case:</strong> Both represent the opposite rotation</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="quaternions-script.js"></script>
-</body>
+        <script src="../js/quaternions-script.js"></script>
+    </body>
 </html>
