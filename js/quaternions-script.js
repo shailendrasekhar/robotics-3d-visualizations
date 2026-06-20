@@ -1,6 +1,11 @@
 // Global variables
-let scene, camera, renderer, object;
+let scene, camera, renderer, object, controls;
 let currentQuaternion = new THREE.Quaternion();
+let targetQuaternion = new THREE.Quaternion(); // orientation the model eases toward
+
+// Axis materials (set in createAxes) + glow state for the highlight effect
+let axisMaterials = { x: null, y: null, z: null };
+let axisGlow = { x: 0, y: 0, z: 0 };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -32,11 +37,14 @@ function initThreeJS() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    // Lighting (tuned for MeshStandardMaterial so the model reads bright and lively)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.6);
+    scene.add(hemiLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     scene.add(directionalLight);
@@ -51,9 +59,15 @@ function initThreeJS() {
     const gridHelper = new THREE.GridHelper(10, 10, 0x888888, 0xcccccc);
     scene.add(gridHelper);
     
-    // Controls for camera
-    addCameraControls();
-    
+    // Orbit controls: inertia (damping) + pinch/drag touch support for tablets & phones
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2;
+    controls.maxDistance = 20;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -62,9 +76,18 @@ function initThreeJS() {
 function createAxes() {
     const axesGroup = new THREE.Group();
     
+    // Emissive standard materials so we can make an axis "glow" on demand
+    const makeAxisMaterial = (color) => new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0,
+        metalness: 0.3,
+        roughness: 0.5
+    });
+
     // X-axis (Red)
     const xGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const xMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    const xMaterial = makeAxisMaterial(0xff0000);
     const xAxis = new THREE.Mesh(xGeometry, xMaterial);
     xAxis.rotation.z = -Math.PI / 2;
     xAxis.position.x = 1.5;
@@ -79,7 +102,7 @@ function createAxes() {
     
     // Y-axis (Green)
     const yGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const yMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+    const yMaterial = makeAxisMaterial(0x00ff00);
     const yAxis = new THREE.Mesh(yGeometry, yMaterial);
     yAxis.position.y = 1.5;
     axesGroup.add(yAxis);
@@ -92,7 +115,7 @@ function createAxes() {
     
     // Z-axis (Blue)
     const zGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const zMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+    const zMaterial = makeAxisMaterial(0x0000ff);
     const zAxis = new THREE.Mesh(zGeometry, zMaterial);
     zAxis.rotation.x = Math.PI / 2;
     zAxis.position.z = 1.5;
@@ -104,8 +127,19 @@ function createAxes() {
     zArrow.rotation.x = Math.PI / 2;
     zArrow.position.z = 3.1;
     axesGroup.add(zArrow);
-    
+
+    // Keep references so we can pulse an axis when the matching control is used
+    axisMaterials.x = xMaterial;
+    axisMaterials.y = yMaterial;
+    axisMaterials.z = zMaterial;
+
     scene.add(axesGroup);
+}
+
+// Make an axis briefly glow (called when its rotation control changes)
+function highlightAxis(axis) {
+    if (axisGlow[axis] === undefined) return;
+    axisGlow[axis] = 1;
 }
 
 // Create the main object to be rotated
@@ -115,21 +149,21 @@ function createMainObject() {
     // Create an airplane-like shape (same as Euler angles page)
     // Fuselage
     const fuselageGeometry = new THREE.CylinderGeometry(0.15, 0.08, 3, 8);
-    const fuselageMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+    const fuselageMaterial = new THREE.MeshStandardMaterial({ color: 0x2f6bff, metalness: 0.4, roughness: 0.35 });
     const fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
     fuselage.rotation.z = Math.PI / 2;
     object.add(fuselage);
     
     // Wings
     const wingGeometry = new THREE.BoxGeometry(0.08, 2.5, 0.4);
-    const wingMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB });
+    const wingMaterial = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, metalness: 0.3, roughness: 0.4 });
     const wings = new THREE.Mesh(wingGeometry, wingMaterial);
     wings.position.x = -0.3;
     object.add(wings);
     
     // Tail
     const tailGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.3);
-    const tailMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB });
+    const tailMaterial = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, metalness: 0.3, roughness: 0.4 });
     const tail = new THREE.Mesh(tailGeometry, tailMaterial);
     tail.position.x = -1.2;
     tail.rotation.y = Math.PI / 2;
@@ -137,7 +171,7 @@ function createMainObject() {
     
     // Nose cone
     const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 8);
-    const noseMaterial = new THREE.MeshLambertMaterial({ color: 0xFF6347 });
+    const noseMaterial = new THREE.MeshStandardMaterial({ color: 0xff5a3c, emissive: 0xff5a3c, emissiveIntensity: 0.25, metalness: 0.3, roughness: 0.4 });
     const nose = new THREE.Mesh(noseGeometry, noseMaterial);
     nose.rotation.z = -Math.PI / 2;
     nose.position.x = 1.75;
@@ -145,13 +179,13 @@ function createMainObject() {
     
     // Add a small sphere at the center to show rotation point
     const centerGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-    const centerMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const centerMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.4, metalness: 0.2, roughness: 0.5 });
     const center = new THREE.Mesh(centerGeometry, centerMaterial);
     object.add(center);
     
     // Add propeller blades
     const propGeometry = new THREE.BoxGeometry(0.05, 0.8, 0.05);
-    const propMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const propMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.3 });
     
     const prop1 = new THREE.Mesh(propGeometry, propMaterial);
     prop1.position.x = 2.0;
@@ -176,31 +210,37 @@ function initControls() {
     quatControls.forEach(control => {
         const slider = document.getElementById(`${control}-slider`);
         const input = document.getElementById(`${control}-input`);
-        
+        const axis = control.slice(-1); // 'x' | 'y' | 'z' (or 'w' — no axis)
+
         slider.addEventListener('input', function() {
             input.value = parseFloat(slider.value).toFixed(3);
+            highlightAxis(axis);
             updateFromQuaternion();
         });
-        
+
         input.addEventListener('input', function() {
             slider.value = input.value;
+            highlightAxis(axis);
             updateFromQuaternion();
         });
     });
     
     // Sync sliders with number inputs for Euler angles
-    const eulerControls = ['euler-roll', 'euler-pitch', 'euler-yaw'];
-    eulerControls.forEach(control => {
+    const eulerAxis = { 'euler-roll': 'x', 'euler-pitch': 'y', 'euler-yaw': 'z' };
+    Object.keys(eulerAxis).forEach(control => {
         const slider = document.getElementById(`${control}-slider`);
         const input = document.getElementById(`${control}-input`);
-        
+        const axis = eulerAxis[control];
+
         slider.addEventListener('input', function() {
             input.value = slider.value;
+            highlightAxis(axis);
             updateFromEuler();
         });
-        
+
         input.addEventListener('input', function() {
             slider.value = input.value;
+            highlightAxis(axis);
             updateFromEuler();
         });
     });
@@ -310,16 +350,13 @@ function updateFromEuler() {
 // Update the complete visualization
 function updateVisualization() {
     if (!object) return;
-    
-    // Apply quaternion rotation to object
-    object.quaternion.copy(currentQuaternion);
-    
+
+    // Set the target orientation; the animate loop slerps the model toward it
+    targetQuaternion.copy(currentQuaternion);
+
     // Update displays
     updateQuaternionDisplay();
     updateEulerDisplay();
-    
-    // Render
-    renderer.render(scene, camera);
 }
 
 // Update quaternion input fields and sliders
@@ -470,54 +507,6 @@ function applyPreset(preset) {
     updateVisualization();
 }
 
-// Add camera controls
-function addCameraControls() {
-    let isDragging = false;
-    let previousMousePosition = { x: 0, y: 0 };
-    
-    const container = document.getElementById('threejs-container');
-    
-    container.addEventListener('mousedown', function(e) {
-        isDragging = true;
-        previousMousePosition = { x: e.clientX, y: e.clientY };
-    });
-    
-    container.addEventListener('mousemove', function(e) {
-        if (isDragging) {
-            const deltaMove = {
-                x: e.clientX - previousMousePosition.x,
-                y: e.clientY - previousMousePosition.y
-            };
-            
-            const spherical = new THREE.Spherical();
-            spherical.setFromVector3(camera.position);
-            spherical.theta -= deltaMove.x * 0.01;
-            spherical.phi += deltaMove.y * 0.01;
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-            
-            camera.position.setFromSpherical(spherical);
-            camera.lookAt(0, 0, 0);
-            
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-            renderer.render(scene, camera);
-        }
-    });
-    
-    container.addEventListener('mouseup', function() {
-        isDragging = false;
-    });
-    
-    container.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        const scale = e.deltaY > 0 ? 1.1 : 0.9;
-        camera.position.multiplyScalar(scale);
-        const distance = camera.position.length();
-        if (distance < 2) camera.position.normalize().multiplyScalar(2);
-        if (distance > 20) camera.position.normalize().multiplyScalar(20);
-        renderer.render(scene, camera);
-    });
-}
-
 // Handle window resize
 function onWindowResize() {
     const container = document.getElementById('threejs-container');
@@ -529,7 +518,28 @@ function onWindowResize() {
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
-    renderer.render(scene, camera);
+
+    // OrbitControls inertia
+    if (controls) controls.update();
+
+    // Slerp the model toward its target orientation for smooth, lively motion
+    if (object) {
+        object.quaternion.slerp(targetQuaternion, 0.15);
+    }
+
+    // Decay the axis glow each frame and push it into the emissive intensity
+    ['x', 'y', 'z'].forEach(axis => {
+        if (axisGlow[axis] > 0.001) {
+            axisGlow[axis] *= 0.9;
+        } else {
+            axisGlow[axis] = 0;
+        }
+        if (axisMaterials[axis]) {
+            axisMaterials[axis].emissiveIntensity = axisGlow[axis];
+        }
+    });
+
+    if (renderer) renderer.render(scene, camera);
 }
 
 // Start animation loop

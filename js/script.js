@@ -1,7 +1,13 @@
 // Global variables
-let scene, camera, renderer, object;
+let scene, camera, renderer, object, controls;
 let currentRotation = { x: 0, y: 0, z: 0 };
+let targetRotation = { x: 0, y: 0, z: 0 }; // radians the object eases toward
 let rotationOrder = 'XYZ';
+
+// Axis materials (set in createAxes) + glow state for the highlight effect
+let axisMaterials = { x: null, y: null, z: null };
+let axisGlow = { x: 0, y: 0, z: 0 };
+const AXIS_COLORS = { x: 0xff0000, y: 0x00ff00, z: 0x0000ff };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -33,11 +39,14 @@ function initThreeJS() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    // Lighting (tuned for MeshStandardMaterial so the model reads bright and lively)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.6);
+    scene.add(hemiLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     scene.add(directionalLight);
@@ -52,9 +61,15 @@ function initThreeJS() {
     const gridHelper = new THREE.GridHelper(10, 10, 0x888888, 0xcccccc);
     scene.add(gridHelper);
     
-    // Controls for camera
-    addCameraControls();
-    
+    // Orbit controls: inertia (damping) + pinch/drag touch support for tablets & phones
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2;
+    controls.maxDistance = 20;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -63,9 +78,18 @@ function initThreeJS() {
 function createAxes() {
     const axesGroup = new THREE.Group();
     
+    // Emissive standard materials so we can make an axis "glow" on demand
+    const makeAxisMaterial = (color) => new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0,
+        metalness: 0.3,
+        roughness: 0.5
+    });
+
     // X-axis (Red)
     const xGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const xMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+    const xMaterial = makeAxisMaterial(0xff0000);
     const xAxis = new THREE.Mesh(xGeometry, xMaterial);
     xAxis.rotation.z = -Math.PI / 2;
     xAxis.position.x = 1.5;
@@ -80,7 +104,7 @@ function createAxes() {
     
     // Y-axis (Green)
     const yGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const yMaterial = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+    const yMaterial = makeAxisMaterial(0x00ff00);
     const yAxis = new THREE.Mesh(yGeometry, yMaterial);
     yAxis.position.y = 1.5;
     axesGroup.add(yAxis);
@@ -93,7 +117,7 @@ function createAxes() {
     
     // Z-axis (Blue)
     const zGeometry = new THREE.CylinderGeometry(0.02, 0.02, 3, 8);
-    const zMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff });
+    const zMaterial = makeAxisMaterial(0x0000ff);
     const zAxis = new THREE.Mesh(zGeometry, zMaterial);
     zAxis.rotation.x = Math.PI / 2;
     zAxis.position.z = 1.5;
@@ -105,11 +129,19 @@ function createAxes() {
     zArrow.rotation.x = Math.PI / 2;
     zArrow.position.z = 3.1;
     axesGroup.add(zArrow);
-    
-    // Add labels
-    const loader = new THREE.FontLoader();
-    
+
+    // Keep references so we can pulse an axis when the matching control is used
+    axisMaterials.x = xMaterial;
+    axisMaterials.y = yMaterial;
+    axisMaterials.z = zMaterial;
+
     scene.add(axesGroup);
+}
+
+// Make an axis briefly glow (called when its rotation control changes)
+function highlightAxis(axis) {
+    if (axisGlow[axis] === undefined) return;
+    axisGlow[axis] = 1;
 }
 
 // Create the main object to be rotated
@@ -119,21 +151,21 @@ function createMainObject() {
     // Create an airplane-like shape (make it bigger and more visible)
     // Fuselage
     const fuselageGeometry = new THREE.CylinderGeometry(0.15, 0.08, 3, 8);
-    const fuselageMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+    const fuselageMaterial = new THREE.MeshStandardMaterial({ color: 0x2f6bff, metalness: 0.4, roughness: 0.35 });
     const fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
     fuselage.rotation.z = Math.PI / 2;
     object.add(fuselage);
     
     // Wings
     const wingGeometry = new THREE.BoxGeometry(0.08, 2.5, 0.4);
-    const wingMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB });
+    const wingMaterial = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, metalness: 0.3, roughness: 0.4 });
     const wings = new THREE.Mesh(wingGeometry, wingMaterial);
     wings.position.x = -0.3;
     object.add(wings);
     
     // Tail
     const tailGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.3);
-    const tailMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB });
+    const tailMaterial = new THREE.MeshStandardMaterial({ color: 0x4fd1ff, metalness: 0.3, roughness: 0.4 });
     const tail = new THREE.Mesh(tailGeometry, tailMaterial);
     tail.position.x = -1.2;
     tail.rotation.y = Math.PI / 2;
@@ -141,7 +173,7 @@ function createMainObject() {
     
     // Nose cone
     const noseGeometry = new THREE.ConeGeometry(0.15, 0.5, 8);
-    const noseMaterial = new THREE.MeshLambertMaterial({ color: 0xFF6347 });
+    const noseMaterial = new THREE.MeshStandardMaterial({ color: 0xff5a3c, emissive: 0xff5a3c, emissiveIntensity: 0.25, metalness: 0.3, roughness: 0.4 });
     const nose = new THREE.Mesh(noseGeometry, noseMaterial);
     nose.rotation.z = -Math.PI / 2;
     nose.position.x = 1.75;
@@ -149,13 +181,13 @@ function createMainObject() {
     
     // Add a small sphere at the center to show rotation point
     const centerGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-    const centerMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const centerMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.4, metalness: 0.2, roughness: 0.5 });
     const center = new THREE.Mesh(centerGeometry, centerMaterial);
     object.add(center);
     
     // Add some propeller blades for more visual interest
     const propGeometry = new THREE.BoxGeometry(0.05, 0.8, 0.05);
-    const propMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const propMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.6, roughness: 0.3 });
     
     const prop1 = new THREE.Mesh(propGeometry, propMaterial);
     prop1.position.x = 2.0;
@@ -174,68 +206,25 @@ function createMainObject() {
     scene.add(object);
 }
 
-// Add camera controls
-function addCameraControls() {
-    let isDragging = false;
-    let previousMousePosition = { x: 0, y: 0 };
-    
-    const container = document.getElementById('threejs-container');
-    
-    container.addEventListener('mousedown', function(e) {
-        isDragging = true;
-        previousMousePosition = { x: e.clientX, y: e.clientY };
-    });
-    
-    container.addEventListener('mousemove', function(e) {
-        if (isDragging) {
-            const deltaMove = {
-                x: e.clientX - previousMousePosition.x,
-                y: e.clientY - previousMousePosition.y
-            };
-            
-            const spherical = new THREE.Spherical();
-            spherical.setFromVector3(camera.position);
-            spherical.theta -= deltaMove.x * 0.01;
-            spherical.phi += deltaMove.y * 0.01;
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-            
-            camera.position.setFromSpherical(spherical);
-            camera.lookAt(0, 0, 0);
-            
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-        }
-    });
-    
-    container.addEventListener('mouseup', function() {
-        isDragging = false;
-    });
-    
-    container.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        const scale = e.deltaY > 0 ? 1.1 : 0.9;
-        camera.position.multiplyScalar(scale);
-        const distance = camera.position.length();
-        if (distance < 2) camera.position.normalize().multiplyScalar(2);
-        if (distance > 20) camera.position.normalize().multiplyScalar(20);
-    });
-}
-
 // Initialize UI controls
 function initControls() {
-    // Sync sliders with number inputs
-    const controls = ['roll', 'pitch', 'yaw'];
-    
-    controls.forEach(control => {
+    // Sync sliders with number inputs. Each control maps to the axis it spins.
+    const controlAxis = { roll: 'x', pitch: 'y', yaw: 'z' };
+
+    Object.keys(controlAxis).forEach(control => {
         const slider = document.getElementById(`${control}-slider`);
         const input = document.getElementById(`${control}-input`);
-        
+        const axis = controlAxis[control];
+
         slider.addEventListener('input', function() {
             input.value = slider.value;
+            highlightAxis(axis);
             updateRotation();
         });
-        
+
         input.addEventListener('input', function() {
             slider.value = input.value;
+            highlightAxis(axis);
             updateRotation();
         });
     });
@@ -306,23 +295,17 @@ function updateRotation() {
 function updateVisualization() {
     if (!object) return;
     
-    // Convert degrees to radians
-    const rollRad = THREE.MathUtils.degToRad(currentRotation.x);
-    const pitchRad = THREE.MathUtils.degToRad(currentRotation.y);
-    const yawRad = THREE.MathUtils.degToRad(currentRotation.z);
-    
-    // Apply rotation based on selected order
+    // Set the target orientation; the animate loop eases the model toward it
     object.rotation.order = rotationOrder;
-    object.rotation.set(rollRad, pitchRad, yawRad);
-    
+    targetRotation.x = THREE.MathUtils.degToRad(currentRotation.x);
+    targetRotation.y = THREE.MathUtils.degToRad(currentRotation.y);
+    targetRotation.z = THREE.MathUtils.degToRad(currentRotation.z);
+
     // Update rotation matrix display
     updateMatrixDisplay();
-    
+
     // Update rotation info display
     updateRotationInfo();
-    
-    // Render the scene
-    renderer.render(scene, camera);
 }
 
 // Update UI elements
@@ -338,8 +321,11 @@ function updateUI() {
 // Update rotation matrix display
 function updateMatrixDisplay() {
     if (!object) return;
-    
-    const matrix = object.matrixWorld.clone();
+
+    // Build the matrix from the target orientation so the numbers reflect the
+    // user's input immediately, even while the model is still easing into place.
+    const euler = new THREE.Euler(targetRotation.x, targetRotation.y, targetRotation.z, rotationOrder);
+    const matrix = new THREE.Matrix4().makeRotationFromEuler(euler);
     const elements = matrix.elements;
     
     // Update matrix inputs (Three.js uses column-major order)
@@ -450,10 +436,7 @@ function updateFromMatrix() {
         updateEulerUI();
         updateObjectRotation();
         updateRotationInfo();
-        
-        // Render the scene
-        renderer.render(scene, camera);
-        
+
     } catch (error) {
         console.error('Invalid matrix values:', error);
     }
@@ -524,7 +507,6 @@ function resetToIdentity() {
     updateEulerUI();
     updateObjectRotation();
     updateRotationInfo();
-    renderer.render(scene, camera);
 }
 
 // Update only Euler angle UI elements
@@ -537,18 +519,14 @@ function updateEulerUI() {
     document.getElementById('yaw-input').value = currentRotation.z;
 }
 
-// Update only object rotation
+// Update only the target orientation (the animate loop eases the model there)
 function updateObjectRotation() {
     if (!object) return;
-    
-    // Convert degrees to radians
-    const rollRad = THREE.MathUtils.degToRad(currentRotation.x);
-    const pitchRad = THREE.MathUtils.degToRad(currentRotation.y);
-    const yawRad = THREE.MathUtils.degToRad(currentRotation.z);
-    
-    // Apply rotation based on selected order
+
     object.rotation.order = rotationOrder;
-    object.rotation.set(rollRad, pitchRad, yawRad);
+    targetRotation.x = THREE.MathUtils.degToRad(currentRotation.x);
+    targetRotation.y = THREE.MathUtils.degToRad(currentRotation.y);
+    targetRotation.z = THREE.MathUtils.degToRad(currentRotation.z);
 }
 
 // Handle window resize
@@ -562,7 +540,30 @@ function onWindowResize() {
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
-    renderer.render(scene, camera);
+
+    // OrbitControls inertia
+    if (controls) controls.update();
+
+    // Ease the model toward its target orientation for smooth, lively motion
+    if (object) {
+        object.rotation.x += (targetRotation.x - object.rotation.x) * 0.15;
+        object.rotation.y += (targetRotation.y - object.rotation.y) * 0.15;
+        object.rotation.z += (targetRotation.z - object.rotation.z) * 0.15;
+    }
+
+    // Decay the axis glow each frame and push it into the emissive intensity
+    ['x', 'y', 'z'].forEach(axis => {
+        if (axisGlow[axis] > 0.001) {
+            axisGlow[axis] *= 0.9;
+        } else {
+            axisGlow[axis] = 0;
+        }
+        if (axisMaterials[axis]) {
+            axisMaterials[axis].emissiveIntensity = axisGlow[axis];
+        }
+    });
+
+    if (renderer) renderer.render(scene, camera);
 }
 
 // Start animation loop

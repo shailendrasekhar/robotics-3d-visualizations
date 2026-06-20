@@ -1,12 +1,21 @@
 // Global variables
-let scene, camera, renderer;
+let scene, camera, renderer, controls;
 let worldFrame, bodyFrame;
-let currentTransform = { 
+let currentTransform = {
     translation: { x: 0, y: 0, z: 0 },
     rotation: { x: 0, y: 0, z: 0 }
 };
+// The body frame eases toward this target (position lerp + orientation slerp)
+let targetTransform = {
+    translation: { x: 0, y: 0, z: 0 },
+    rotation: new THREE.Quaternion()
+};
 let points = [];
 let testPoint = null;
+
+// World-frame axis materials + glow state for the highlight effect
+let axisMaterials = { x: null, y: null, z: null };
+let axisGlow = { x: 0, y: 0, z: 0 };
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -36,11 +45,14 @@ function initThreeJS() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
     
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    // Lighting (tuned for MeshStandardMaterial so the scene reads bright and lively)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444466, 0.6);
+    scene.add(hemiLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.1);
     directionalLight.position.set(10, 10, 5);
     directionalLight.castShadow = true;
     scene.add(directionalLight);
@@ -53,9 +65,15 @@ function initThreeJS() {
     const gridHelper = new THREE.GridHelper(10, 20, 0x888888, 0xcccccc);
     scene.add(gridHelper);
     
-    // Add camera controls
-    addCameraControls();
-    
+    // Orbit controls: inertia (damping) + pinch/drag touch support for tablets & phones
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 3;
+    controls.maxDistance = 30;
+    controls.target.set(0, 0, 0);
+    controls.update();
+
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
 }
@@ -65,20 +83,20 @@ function createWorldFrame() {
     worldFrame = new THREE.Group();
     worldFrame.name = 'WorldFrame';
     
-    // Create axes with labels
-    createAxisWithLabel(worldFrame, 'x', 0xff0000, new THREE.Vector3(3, 0, 0));
-    createAxisWithLabel(worldFrame, 'y', 0x00ff00, new THREE.Vector3(0, 3, 0));
-    createAxisWithLabel(worldFrame, 'z', 0x0000ff, new THREE.Vector3(0, 0, 3));
+    // Create axes with labels (register materials so they can glow on rotation)
+    createAxisWithLabel(worldFrame, 'x', 0xff0000, new THREE.Vector3(3, 0, 0), false, true);
+    createAxisWithLabel(worldFrame, 'y', 0x00ff00, new THREE.Vector3(0, 3, 0), false, true);
+    createAxisWithLabel(worldFrame, 'z', 0x0000ff, new THREE.Vector3(0, 0, 3), false, true);
     
     // Add origin sphere
     const originGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-    const originMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
+    const originMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.3, roughness: 0.5 });
     const origin = new THREE.Mesh(originGeometry, originMaterial);
     worldFrame.add(origin);
-    
+
     // Add frame label
     addFrameLabel(worldFrame, 'W', new THREE.Vector3(0, 3.5, 0), 0x000000);
-    
+
     scene.add(worldFrame);
 }
 
@@ -94,7 +112,7 @@ function createBodyFrame() {
     
     // Add origin sphere
     const originGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-    const originMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+    const originMaterial = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.3, roughness: 0.5 });
     const origin = new THREE.Mesh(originGeometry, originMaterial);
     bodyFrame.add(origin);
     
@@ -103,10 +121,12 @@ function createBodyFrame() {
     
     // Add a simple body object (cube)
     const bodyGeometry = new THREE.BoxGeometry(0.5, 0.3, 0.8);
-    const bodyMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x4169E1, 
-        transparent: true, 
-        opacity: 0.7 
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2f6bff,
+        metalness: 0.4,
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.75
     });
     const bodyObject = new THREE.Mesh(bodyGeometry, bodyMaterial);
     bodyObject.position.set(0.5, 0, 0);
@@ -116,16 +136,27 @@ function createBodyFrame() {
 }
 
 // Create axis with arrow and label
-function createAxisWithLabel(parent, axis, color, direction, isDashed = false) {
+function createAxisWithLabel(parent, axis, color, direction, isDashed = false, registerGlow = false) {
     const length = direction.length();
-    
+
     // Axis line
     const geometry = new THREE.CylinderGeometry(0.02, 0.02, length, 8);
-    const material = new THREE.MeshLambertMaterial({ color: color });
-    
+    const material = new THREE.MeshStandardMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0,
+        metalness: 0.3,
+        roughness: 0.5
+    });
+
     if (isDashed) {
         material.transparent = true;
         material.opacity = 0.8;
+    }
+
+    // Keep world-frame axis materials so we can pulse them when a rotation control is used
+    if (registerGlow) {
+        axisMaterials[axis] = material;
     }
     
     const axisLine = new THREE.Mesh(geometry, material);
@@ -201,19 +232,22 @@ function initControls() {
         });
     });
     
-    // Sync sliders with number inputs for rotation
+    // Sync sliders with number inputs for rotation (and glow the matching world axis)
     const rotControls = ['rot-x', 'rot-y', 'rot-z'];
     rotControls.forEach(control => {
         const slider = document.getElementById(control);
         const input = document.getElementById(`${control}-input`);
-        
+        const axis = control.slice(-1); // 'x' | 'y' | 'z'
+
         slider.addEventListener('input', function() {
             input.value = slider.value;
+            highlightAxis(axis);
             updateTransformation();
         });
-        
+
         input.addEventListener('input', function() {
             slider.value = input.value;
+            highlightAxis(axis);
             updateTransformation();
         });
     });
@@ -224,18 +258,15 @@ function initEventListeners() {
     // Frame visibility controls
     document.getElementById('show-world-frame').addEventListener('change', function() {
         worldFrame.visible = this.checked;
-        renderer.render(scene, camera);
     });
-    
+
     document.getElementById('show-body-frame').addEventListener('change', function() {
         bodyFrame.visible = this.checked;
-        renderer.render(scene, camera);
     });
-    
+
     document.getElementById('show-grid').addEventListener('change', function() {
         const grid = scene.getObjectByName('GridHelper');
         if (grid) grid.visible = this.checked;
-        renderer.render(scene, camera);
     });
     
     // Point transformation controls
@@ -255,36 +286,48 @@ function initEventListeners() {
     });
 }
 
+// Make a world axis briefly glow (called when its rotation control changes)
+function highlightAxis(axis) {
+    if (axisGlow[axis] === undefined) return;
+    axisGlow[axis] = 1;
+}
+
+// The body frame's target world matrix (translation + rotation), used for displays
+// so the readouts reflect the final transform immediately while the frame eases there.
+function getTargetBodyMatrix() {
+    const pos = new THREE.Vector3(
+        targetTransform.translation.x,
+        targetTransform.translation.y,
+        targetTransform.translation.z
+    );
+    return new THREE.Matrix4().compose(pos, targetTransform.rotation, new THREE.Vector3(1, 1, 1));
+}
+
 // Update transformation
 function updateTransformation() {
-    // Update current transform values
+    // Read current transform values from the UI
     currentTransform.translation.x = parseFloat(document.getElementById('trans-x-input').value);
     currentTransform.translation.y = parseFloat(document.getElementById('trans-y-input').value);
     currentTransform.translation.z = parseFloat(document.getElementById('trans-z-input').value);
     currentTransform.rotation.x = parseFloat(document.getElementById('rot-x-input').value);
     currentTransform.rotation.y = parseFloat(document.getElementById('rot-y-input').value);
     currentTransform.rotation.z = parseFloat(document.getElementById('rot-z-input').value);
-    
-    // Apply transformation to body frame
-    bodyFrame.position.set(
-        currentTransform.translation.x,
-        currentTransform.translation.y,
-        currentTransform.translation.z
-    );
-    
-    bodyFrame.rotation.set(
+
+    // Set the target the body frame eases toward (position lerp + orientation slerp)
+    targetTransform.translation.x = currentTransform.translation.x;
+    targetTransform.translation.y = currentTransform.translation.y;
+    targetTransform.translation.z = currentTransform.translation.z;
+    targetTransform.rotation.setFromEuler(new THREE.Euler(
         THREE.MathUtils.degToRad(currentTransform.rotation.x),
         THREE.MathUtils.degToRad(currentTransform.rotation.y),
-        THREE.MathUtils.degToRad(currentTransform.rotation.z)
-    );
-    
-    // Update displays
+        THREE.MathUtils.degToRad(currentTransform.rotation.z),
+        'XYZ'
+    ));
+
+    // Update displays from the target so the numbers are accurate immediately
     updateTransformationMatrix();
     updateFrameInfo();
     updatePointTransformation();
-    
-    // Render
-    renderer.render(scene, camera);
 }
 
 // Update the complete visualization
@@ -294,9 +337,8 @@ function updateVisualization() {
 
 // Update transformation matrix display
 function updateTransformationMatrix() {
-    // Get the world matrix of the body frame
-    bodyFrame.updateMatrixWorld();
-    const matrix = bodyFrame.matrixWorld;
+    // Use the target transform so the matrix reflects the final pose immediately
+    const matrix = getTargetBodyMatrix();
     const elements = matrix.elements;
     
     // Update matrix display (Three.js uses column-major order)
@@ -342,12 +384,11 @@ function updatePointTransformation() {
     // Create point in body frame
     const pointBody = new THREE.Vector3(x, y, z);
     
-    // Transform to world frame
-    bodyFrame.updateMatrixWorld();
-    const pointWorld = pointBody.clone().applyMatrix4(bodyFrame.matrixWorld);
-    
+    // Transform to world frame using the target pose
+    const pointWorld = pointBody.clone().applyMatrix4(getTargetBodyMatrix());
+
     // Update display
-    document.getElementById('transformed-coords').textContent = 
+    document.getElementById('transformed-coords').textContent =
         `(${pointWorld.x.toFixed(3)}, ${pointWorld.y.toFixed(3)}, ${pointWorld.z.toFixed(3)})`;
     
     // Update test point visualization if it exists
@@ -367,17 +408,16 @@ function addPoint() {
     
     // Create point geometry
     const pointGeometry = new THREE.SphereGeometry(0.05, 16, 16);
-    const pointMaterial = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
+    const pointMaterial = new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0xff6b6b, emissiveIntensity: 0.3, metalness: 0.2, roughness: 0.5 });
     
     // Point in body frame
     const bodyPoint = new THREE.Mesh(pointGeometry, pointMaterial);
     bodyPoint.position.copy(pointBody);
     bodyFrame.add(bodyPoint);
     
-    // Point in world frame
-    bodyFrame.updateMatrixWorld();
-    const pointWorld = pointBody.clone().applyMatrix4(bodyFrame.matrixWorld);
-    const worldPointMaterial = new THREE.MeshLambertMaterial({ color: 0x4ecdc4 });
+    // Point in world frame (snapshot at the target pose)
+    const pointWorld = pointBody.clone().applyMatrix4(getTargetBodyMatrix());
+    const worldPointMaterial = new THREE.MeshStandardMaterial({ color: 0x4ecdc4, emissive: 0x4ecdc4, emissiveIntensity: 0.3, metalness: 0.2, roughness: 0.5 });
     const worldPoint = new THREE.Mesh(pointGeometry, worldPointMaterial);
     worldPoint.position.copy(pointWorld);
     scene.add(worldPoint);
@@ -396,7 +436,6 @@ function addPoint() {
     scene.add(line);
     
     points.push({ bodyPoint, worldPoint, line });
-    renderer.render(scene, camera);
 }
 
 // Clear all points
@@ -407,7 +446,6 @@ function clearPoints() {
         scene.remove(point.line);
     });
     points = [];
-    renderer.render(scene, camera);
 }
 
 // Apply preset transformations
@@ -452,54 +490,6 @@ function setTransform(tx, ty, tz, rx, ry, rz) {
     updateTransformation();
 }
 
-// Add camera controls
-function addCameraControls() {
-    let isDragging = false;
-    let previousMousePosition = { x: 0, y: 0 };
-    
-    const container = document.getElementById('threejs-container');
-    
-    container.addEventListener('mousedown', function(e) {
-        isDragging = true;
-        previousMousePosition = { x: e.clientX, y: e.clientY };
-    });
-    
-    container.addEventListener('mousemove', function(e) {
-        if (isDragging) {
-            const deltaMove = {
-                x: e.clientX - previousMousePosition.x,
-                y: e.clientY - previousMousePosition.y
-            };
-            
-            const spherical = new THREE.Spherical();
-            spherical.setFromVector3(camera.position);
-            spherical.theta -= deltaMove.x * 0.01;
-            spherical.phi += deltaMove.y * 0.01;
-            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
-            
-            camera.position.setFromSpherical(spherical);
-            camera.lookAt(0, 0, 0);
-            
-            previousMousePosition = { x: e.clientX, y: e.clientY };
-            renderer.render(scene, camera);
-        }
-    });
-    
-    container.addEventListener('mouseup', function() {
-        isDragging = false;
-    });
-    
-    container.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        const scale = e.deltaY > 0 ? 1.1 : 0.9;
-        camera.position.multiplyScalar(scale);
-        const distance = camera.position.length();
-        if (distance < 3) camera.position.normalize().multiplyScalar(3);
-        if (distance > 30) camera.position.normalize().multiplyScalar(30);
-        renderer.render(scene, camera);
-    });
-}
-
 // Handle window resize
 function onWindowResize() {
     const container = document.getElementById('threejs-container');
@@ -511,7 +501,18 @@ function onWindowResize() {
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
-    
+
+    // OrbitControls inertia
+    if (controls) controls.update();
+
+    // Ease the body frame toward its target pose (position lerp + orientation slerp)
+    if (bodyFrame) {
+        bodyFrame.position.x += (targetTransform.translation.x - bodyFrame.position.x) * 0.15;
+        bodyFrame.position.y += (targetTransform.translation.y - bodyFrame.position.y) * 0.15;
+        bodyFrame.position.z += (targetTransform.translation.z - bodyFrame.position.z) * 0.15;
+        bodyFrame.quaternion.slerp(targetTransform.rotation, 0.15);
+    }
+
     // Update point lines if any exist
     points.forEach(point => {
         if (point.line) {
@@ -520,8 +521,20 @@ function animate() {
             point.line.geometry.setFromPoints([bodyWorldPos, worldPos]);
         }
     });
-    
-    renderer.render(scene, camera);
+
+    // Decay the axis glow each frame and push it into the emissive intensity
+    ['x', 'y', 'z'].forEach(axis => {
+        if (axisGlow[axis] > 0.001) {
+            axisGlow[axis] *= 0.9;
+        } else {
+            axisGlow[axis] = 0;
+        }
+        if (axisMaterials[axis]) {
+            axisMaterials[axis].emissiveIntensity = axisGlow[axis];
+        }
+    });
+
+    if (renderer) renderer.render(scene, camera);
 }
 
 // Start animation loop
